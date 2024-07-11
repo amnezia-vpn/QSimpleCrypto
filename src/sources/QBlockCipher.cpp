@@ -75,10 +75,11 @@ QByteArray QSimpleCrypto::QBlockCipher::encryptAesBlockCipher(const QByteArray& 
             throw std::runtime_error("Couldn't allocate memory for 'cipherText'.");
         }
 
-        /* Start encryption with password based encryption routine */
-        if (!EVP_BytesToKey(cipher, md, reinterpret_cast<const unsigned char*>(salt.data()), reinterpret_cast<const unsigned char*>(password.data()), password.length(), rounds, m_key, m_iv)) {
-            throw std::runtime_error("Couldn't start encryption routine. EVP_BytesToKey(). Error: " + QByteArray(ERR_error_string(ERR_get_error(), nullptr)));
-        }
+//        disabled for backward compatibility
+//        /* Start encryption with password based encryption routine */
+//        if (!EVP_BytesToKey(cipher, md, reinterpret_cast<const unsigned char*>(salt.data()), reinterpret_cast<const unsigned char*>(password.data()), password.length(), rounds, m_key, m_iv)) {
+//            throw std::runtime_error("Couldn't start encryption routine. EVP_BytesToKey(). Error: " + QByteArray(ERR_error_string(ERR_get_error(), nullptr)));
+//        }
 
         /* Initialize encryption operation. */
         if (!EVP_EncryptInit_ex(encryptionCipher.get(), cipher, nullptr, m_key, m_iv)) {
@@ -144,10 +145,11 @@ QByteArray QSimpleCrypto::QBlockCipher::decryptAesBlockCipher(const QByteArray& 
             throw std::runtime_error("Couldn't allocate memory for \'plainText\'. EVP_CIPHER_CTX_new(). Error: " + QByteArray(ERR_error_string(ERR_get_error(), nullptr)));
         }
 
-        /* Start encryption with password based encryption routine */
-        if (!EVP_BytesToKey(cipher, md, reinterpret_cast<const unsigned char*>(salt.data()), reinterpret_cast<const unsigned char*>(password.data()), password.length(), rounds, m_key, m_iv)) {
-            throw std::runtime_error("Couldn't start decryption routine. EVP_BytesToKey(). Error: " + QByteArray(ERR_error_string(ERR_get_error(), nullptr)));
-        }
+//        disabled for backward compatibility
+//        /* Start encryption with password based encryption routine */
+//        if (!EVP_BytesToKey(cipher, md, reinterpret_cast<const unsigned char*>(salt.data()), reinterpret_cast<const unsigned char*>(password.data()), password.length(), rounds, m_key, m_iv)) {
+//            throw std::runtime_error("Couldn't start decryption routine. EVP_BytesToKey(). Error: " + QByteArray(ERR_error_string(ERR_get_error(), nullptr)));
+//        }
 
         /* Initialize decryption operation. */
         if (!EVP_DecryptInit_ex(decryptionCipher.get(), cipher, nullptr, m_key, m_iv)) {
