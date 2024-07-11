@@ -20,10 +20,11 @@ QSimpleCrypto::QRsa::QRsa()
 ///
 EVP_PKEY* QSimpleCrypto::QRsa::generateRsaKeys(quint32 bits, quint32 rsaPrimeNumber)
 {
+    EVP_PKEY_CTX* rsaKeysContext = nullptr;
     try {
         /* Initialize RSA */
         EVP_PKEY* rsaKeys = nullptr;
-        EVP_PKEY_CTX* rsaKeysContext = EVP_PKEY_CTX_new_from_name(nullptr, "RSA", nullptr);
+        rsaKeysContext = EVP_PKEY_CTX_new_from_name(nullptr, "RSA", nullptr);
         if (!rsaKeysContext) {
             throw std::runtime_error("Couldn't initialize EVP_PKEY_CTX. EVP_PKEY_CTX_new_from_name(). Error: " + QByteArray(ERR_error_string(ERR_get_error(), nullptr)));
         }
@@ -59,10 +60,17 @@ EVP_PKEY* QSimpleCrypto::QRsa::generateRsaKeys(quint32 bits, quint32 rsaPrimeNum
             throw std::runtime_error("Couldn't generate EVP_PKEY key. EVP_PKEY_generate(). Error: " + QByteArray(ERR_error_string(ERR_get_error(), nullptr)));
         }
 
+        EVP_PKEY_CTX_free(rsaKeysContext);
         return rsaKeys;
     } catch (const std::exception& exception) {
+        if (rsaKeysContext) {
+            EVP_PKEY_CTX_free(rsaKeysContext);
+        }
         std::throw_with_nested(exception);
     } catch (...) {
+        if (rsaKeysContext) {
+            EVP_PKEY_CTX_free(rsaKeysContext);
+        }
         throw;
     }
 }
@@ -209,9 +217,10 @@ EVP_PKEY* QSimpleCrypto::QRsa::getPrivateKeyFromFile(const QByteArray& filePath,
 ///
 QByteArray QSimpleCrypto::QRsa::encrypt(QByteArray plainText, EVP_PKEY* key, const quint16 padding)
 {
+    EVP_PKEY_CTX* rsaKeyContext = nullptr;
     try {
         /* Initialize CTX for 'key' */
-        EVP_PKEY_CTX* rsaKeyContext = EVP_PKEY_CTX_new(key, nullptr);
+        rsaKeyContext = EVP_PKEY_CTX_new(key, nullptr);
         if (!rsaKeyContext) {
             throw std::runtime_error("Couldn't initialize EVP_PKEY_CTX. EVP_PKEY_CTX_new(). Error: " + QByteArray(ERR_error_string(ERR_get_error(), nullptr)));
         }
@@ -247,10 +256,17 @@ QByteArray QSimpleCrypto::QRsa::encrypt(QByteArray plainText, EVP_PKEY* key, con
             throw std::runtime_error("Couldn't encrypt data. EVP_PKEY_encrypt(). Error: " + QByteArray(ERR_error_string(ERR_get_error(), nullptr)));
         }
 
+        EVP_PKEY_CTX_free(rsaKeyContext);
         return QByteArray(reinterpret_cast<char*>(cipherText.get()), encryptedDataLength);
     } catch (const std::exception& exception) {
+        if (rsaKeyContext) {
+            EVP_PKEY_CTX_free(rsaKeyContext);
+        }
         std::throw_with_nested(exception);
     } catch (...) {
+        if (rsaKeyContext) {
+            EVP_PKEY_CTX_free(rsaKeyContext);
+        }
         throw;
     }
 }
@@ -264,9 +280,10 @@ QByteArray QSimpleCrypto::QRsa::encrypt(QByteArray plainText, EVP_PKEY* key, con
 ///
 QByteArray QSimpleCrypto::QRsa::decrypt(QByteArray cipherText, EVP_PKEY* key, const quint16 padding)
 {
+    EVP_PKEY_CTX* rsaKeyContext = nullptr;
     try {
         /* Initialize CTX for 'key' */
-        EVP_PKEY_CTX* rsaKeyContext = EVP_PKEY_CTX_new(key, nullptr);
+        rsaKeyContext = EVP_PKEY_CTX_new(key, nullptr);
         if (!rsaKeyContext) {
             throw std::runtime_error("Couldn't initialize EVP_PKEY_CTX. EVP_PKEY_CTX_new(). Error: " + QByteArray(ERR_error_string(ERR_get_error(), nullptr)));
         }
@@ -302,7 +319,148 @@ QByteArray QSimpleCrypto::QRsa::decrypt(QByteArray cipherText, EVP_PKEY* key, co
             throw std::runtime_error("Couldn't encrypt data. EVP_PKEY_encrypt(). Error: " + QByteArray(ERR_error_string(ERR_get_error(), nullptr)));
         }
 
+        EVP_PKEY_CTX_free(rsaKeyContext);
         return QByteArray(reinterpret_cast<char*>(plainText.get()), decryptedDataLength);
+    } catch (const std::exception& exception) {
+        if (rsaKeyContext) {
+            EVP_PKEY_CTX_free(rsaKeyContext);
+        }
+        std::throw_with_nested(exception);
+    } catch (...) {
+        if (rsaKeyContext) {
+            EVP_PKEY_CTX_free(rsaKeyContext);
+        }
+        throw;
+    }
+}
+
+QByteArray QSimpleCrypto::QRsa::savePrivateKeyToByteArray(EVP_PKEY* key, QByteArray password, const EVP_CIPHER* cipher)
+{
+    QByteArray privateKeyData;
+
+    try {
+        /* Create a memory BIO */
+        BIO* mem = BIO_new(BIO_s_mem());
+        if (!mem) {
+            throw std::runtime_error("Couldn't create BIO.");
+        }
+
+        /* Write private key to BIO */
+        if (!PEM_write_bio_PrivateKey(mem, key, cipher, reinterpret_cast<unsigned char*>(password.data()), password.size(), nullptr, nullptr)) {
+            BIO_free(mem);
+            throw std::runtime_error("Couldn't save private key. PEM_write_bio_PrivateKey(). Error: " + QByteArray(ERR_error_string(ERR_get_error(), nullptr)));
+        }
+
+        /* Get the data from the BIO */
+        BUF_MEM* memPtr;
+        BIO_get_mem_ptr(mem, &memPtr);
+        privateKeyData = QByteArray(memPtr->data, memPtr->length);
+
+        /* Clean up BIO */
+        BIO_free(mem);
+    } catch (const std::exception& exception) {
+        std::throw_with_nested(exception);
+    } catch (...) {
+        throw;
+    }
+
+    return privateKeyData;
+}
+
+QByteArray QSimpleCrypto::QRsa::savePublicKeyToByteArray(EVP_PKEY* key)
+{
+    QByteArray publicKeyData;
+
+    try {
+        /* Create a memory BIO */
+        BIO* mem = BIO_new(BIO_s_mem());
+        if (!mem) {
+            throw std::runtime_error("Couldn't create BIO.");
+        }
+
+        /* Write public key to BIO */
+        if (!PEM_write_bio_PUBKEY(mem, key)) {
+            BIO_free(mem);
+            throw std::runtime_error("Couldn't save public key. PEM_write_bio_PUBKEY(). Error: " + QByteArray(ERR_error_string(ERR_get_error(), nullptr)));
+        }
+
+        /* Get the data from the BIO */
+        BUF_MEM* memPtr;
+        BIO_get_mem_ptr(mem, &memPtr);
+        publicKeyData = QByteArray(memPtr->data, memPtr->length);
+
+        /* Clean up BIO */
+        BIO_free(mem);
+    } catch (const std::exception& exception) {
+        std::throw_with_nested(exception);
+    } catch (...) {
+        throw;
+    }
+
+    return publicKeyData;
+}
+
+EVP_PKEY* QSimpleCrypto::QRsa::getPublicKeyFromByteArray(const QByteArray& publicKeyData)
+{
+    try {
+        /* Initialize memory BIO */
+        BIO* mem = BIO_new_mem_buf(publicKeyData.data(), publicKeyData.size());
+        if (!mem) {
+            throw std::runtime_error("Couldn't create BIO.");
+        }
+
+        /* Initialize EVP_PKEY */
+        EVP_PKEY* keyStore = nullptr;
+        if (!(keyStore = EVP_PKEY_new())) {
+            BIO_free(mem);
+            throw std::runtime_error("Couldn't initialize keyStore. EVP_PKEY_new(). Error: " + QByteArray(ERR_error_string(ERR_get_error(), nullptr)));
+        }
+
+        /* Read public key from BIO */
+        if (!PEM_read_bio_PUBKEY(mem, &keyStore, nullptr, nullptr)) {
+            BIO_free(mem);
+            EVP_PKEY_free(keyStore);
+            throw std::runtime_error("Couldn't read public key. PEM_read_bio_PUBKEY(). Error: " + QByteArray(ERR_error_string(ERR_get_error(), nullptr)));
+        }
+
+        /* Clean up BIO */
+        BIO_free(mem);
+
+        return keyStore;
+    } catch (const std::exception& exception) {
+        std::throw_with_nested(exception);
+    } catch (...) {
+        throw;
+    }
+}
+
+EVP_PKEY* QSimpleCrypto::QRsa::getPrivateKeyFromByteArray(const QByteArray& privateKeyData, const QByteArray& password)
+{
+    try {
+        /* Initialize memory BIO */
+        BIO* mem = BIO_new_mem_buf(privateKeyData.data(), privateKeyData.size());
+        if (!mem) {
+            throw std::runtime_error("Couldn't create BIO.");
+        }
+
+        /* Initialize EVP_PKEY */
+        EVP_PKEY* keyStore = nullptr;
+        if (!(keyStore = EVP_PKEY_new())) {
+            BIO_free(mem);
+            throw std::runtime_error("Couldn't initialize keyStore. EVP_PKEY_new(). Error: " + QByteArray(ERR_error_string(ERR_get_error(), nullptr)));
+        }
+
+        /* Read public key from BIO */
+        if (!PEM_read_bio_PrivateKey(mem, &keyStore, nullptr, static_cast<void*>(const_cast<char*>(password.data())))) {
+            BIO_free(mem);
+            EVP_PKEY_free(keyStore);
+            throw std::runtime_error("Couldn't read public key. PEM_read_bio_PrivateKey(). Error: " + QByteArray(ERR_error_string(ERR_get_error(), nullptr)));
+        }
+
+        /* Clean up BIO */
+        BIO_free(mem);
+
+        return keyStore;
     } catch (const std::exception& exception) {
         std::throw_with_nested(exception);
     } catch (...) {
